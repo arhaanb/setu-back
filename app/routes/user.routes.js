@@ -8,54 +8,83 @@ const User = require('../models/user.model')
 const Company = require('../models/company.model')
 const Thread = require('../models/threads.model')
 const Investment = require('../models/investment.model')
-const stripe = require('stripe')(process.env.STRIPE_KEY_2)
+const axios = require('axios')
 
 app.get('/all', controller.allAccess)
+
+app.post('/notifications', async (req, res) => {
+	return res.send(req.body)
+})
 
 app.get('/checkout-session', async (req, res) => {
 	var domain
 	if (process.env.NODE_ENV == 'production') {
-		domain = 'https://getpayout.co'
+		domain = 'https://untitledarhnhack.herokuapp.com'
 	} else {
-		domain = 'http://localhost:3000'
+		domain = 'http://localhost:8080'
 	}
 
-	// console.log(req.query)
+	function makeid(length) {
+		var result = ''
+		var characters =
+			'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+		var charactersLength = characters.length
+		for (var i = 0; i < length; i++) {
+			result += characters.charAt(Math.floor(Math.random() * charactersLength))
+		}
+		return result
+	}
 
-	const session = await stripe.checkout.sessions.create({
-		line_items: [
-			{
-				price_data: {
-					currency: 'usd',
-					product_data: {
-						name: `Investment to ${
-							req?.query?.company ? req?.query?.company : 'Company Name'
-						}`
+	axios
+		.post('https://uat.setu.co/api/v2/auth/token', {
+			clientID: process.env.SETU_CLIENT,
+			secret: process.env.SETU_SECRET
+		})
+		.then((response) => {
+			axios
+				.post(
+					'https://uat.setu.co/api/v2/payment-links',
+					{
+						billerBillID: makeid(9),
+						amount: {
+							value: 100000,
+							currencyCode: 'INR'
+						},
+						amountExactness: 'EXACT'
 					},
-					unit_amount: parseInt(req?.query?.amt) * 100
-				},
+					{
+						headers: {
+							'X-Setu-Product-Instance-ID': '836552547916318473',
+							authorization: `Bearer ${response?.data?.data?.token}`,
+							'Content-Type': 'application/json'
+						}
+					}
+				)
+				.then((resp) => {
+					const site = `<!DOCTYPE html><html><head> <link rel="preconnect" href="https://fonts.googleapis.com"> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600&display=swap" rel="stylesheet"> <title>Payout.</title> <link rel="icon" type="image/x-icon" href="https://getpayout.co/favicon.ico"></head><style>*{font-family: 'Manrope', 'sans-serif'; -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;}.btn{background-color: rgb(79, 228, 153); padding: 1em 2em; border: none; transition: 0.3s; border-radius: 0.5em; float: right;}.cont{margin: 0 auto; padding: 0 2em; max-width: 80%;}.btn:hover{background-color: rgb(39, 201, 120); cursor: pointer;}.green{color: rgb(10, 141, 75);}iframe{border: none !important;}</style><body> <div class="cont"> <br><h2 style="margin: 0; font-size: 2.5em; font-weight:600;">Payout.</h2> <p style="margin: 0; font-size: 1.4em; opacity: 0.8;">You are investing <span class="green">
+				$${req?.query?.amt
+					?.toString()
+					.replace(
+						/\B(?=(\d{3})+(?!\d))/g,
+						','
+					)}</span> in <span class="green">${
+						req?.query?.company
+					}</span>.</p><iframe src="${
+						resp?.data?.data?.paymentLink?.shortURL
+					}" height="500em" width="100%" title="Setu UPI Deeplink"></iframe> <a href="${domain}/api/success/pay?company=${
+						req?.query?.company
+					}&amt=${req?.query?.amt}&percent=${req?.query?.percent}&compuser=${
+						req?.query?.username
+					}&userid=${
+						req?.query?.userid
+					}"> <button class="btn">Skip payment &rarr;</button> </a> </div></body></html>`
 
-				quantity: 1
-			}
-		],
-		billing_address_collection: 'auto',
-		shipping_address_collection: {
-			allowed_countries: ['US', 'CA']
-		},
-		mode: 'payment',
-		success_url: `${
-			process.env.NODE_ENV == 'production'
-				? 'https://untitledarhnhack.herokuapp.com'
-				: 'http://localhost:8080'
-		}/api/success/pay?company=${req?.query?.company}&amt=${
-			req?.query?.amt
-		}&percent=${req?.query?.percent}&compuser=${req?.query?.username}&userid=${
-			req?.query?.userid
-		}`,
-		cancel_url: `${domain}/discover`
-	})
-
-	res.redirect(303, session.url)
+					return res.send(site)
+				})
+				.catch((err) => {
+					console.log(err)
+				})
+		})
 })
 
 app.get('/success/pay', (req, res) => {
