@@ -9,9 +9,9 @@
 
 ## GitHub Repositories
 
-- Web app: https://github.com/arhaanb/payout-frontend
-- Mobile app: https://github.com/arhaanb/payout-mobileapp
-- Backend API: https://github.com/arhaanb/payout-backend
+- Web app: https://github.com/arhaanb/setu-front
+- Mobile app: https://github.com/arhaanb/setu-mobile
+- Backend API: https://github.com/arhaanb/setu-back
 
 ## Steps to run
 
